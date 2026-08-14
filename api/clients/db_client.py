@@ -8,9 +8,9 @@ straight from the log.
 
 Nothing is held between queries. `ScoringDatabase` owns the engine, and every
 query takes a cursor from the pool inside a `with` block: leaving the block
-closes the implicit transaction and hands the connection back. A test never
-leaves an "idle in transaction" session behind on the stand, and one test
-cannot block another on the same rows.
+closes the transaction (committing it for writes) and hands the connection
+back. A test never leaves an "idle in transaction" session behind on the
+stand, and one test cannot block another on the same rows.
 """
 
 from __future__ import annotations
@@ -68,14 +68,14 @@ def scoring_database(url: str) -> Iterator[ScoringDatabase]:
 
 
 class ScoringDatabase:
-    """Read access to the scoring database: named queries, no SQL in tests."""
+    """Access to the scoring database: named queries, no SQL in tests."""
 
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
     @contextmanager
     def cursor(self) -> Iterator[Connection]:
-        """A cursor for one operation, returned to the pool when the block ends.
+        """A read cursor for one operation, returned to the pool when the block ends.
 
         Named queries below cover what the tests need; this is the escape hatch
         for a one-off check, and it keeps the same no-holds guarantee:
@@ -85,6 +85,24 @@ class ScoringDatabase:
         """
         with self._engine.connect() as connection:
             yield connection
+
+    @contextmanager
+    def transaction(self) -> Iterator[Connection]:
+        """A write cursor: commits when the block ends, rolls back on any exception.
+
+        For state the API cannot produce — seeding a row, clearing what a test
+        left behind. Commit and rollback are the block's job, so a failing test
+        never leaves half-written data:
+
+            with scoring_db.transaction() as cur:
+                cur.execute(text("DELETE FROM transactions WHERE user_id = :user_id"), params)
+        """
+        log.debug("opening a write transaction")
+
+        with self._engine.begin() as connection:
+            yield connection
+
+        log.debug("write transaction committed")
 
     @allure.step("Read decision of the last transaction from DB")
     def last_decision(self, user_id: str) -> str:
