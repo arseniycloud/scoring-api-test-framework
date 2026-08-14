@@ -19,7 +19,7 @@ scoring_test_framework/
 │   ├── clients/
 │   │   ├── base_client.py       # транспорт: Retry/backoff, таймауты, логи, attach в Allure
 │   │   ├── scoring_client.py    # доменные методы + wait_for_decision (поллинг вместо sleep)
-│   │   └── db_client.py         # SQLAlchemy: build_engine + TransactionsRepository
+│   │   └── db_client.py         # SQLAlchemy: scoring_database() + TransactionsRepository
 │   └── utils/
 │       ├── constants.py         # SCR_RESPONSE_KEYS, SCR_INVALID_DATA, SCR_LIMITS, enum'ы
 │       ├── payloads.py          # фабрики тел запросов: new_user(), high_risk_transaction(), …
@@ -123,8 +123,7 @@ AssertionError: Expected BLOCK, got APPROVE: {'id': '2e2f1ff3-…', 'decision': 
 | `config` | session | `Config` из окружения, `--scoring-base-url` перекрывает `SCORING_BASE_URL` |
 | `http_session` | session | `requests.Session` с ретраями, закрывается в teardown |
 | `scoring_client` | session | `ScoringClient` — доменные методы поверх транспорта |
-| `db_engine` | session | SQLAlchemy `Engine`; без `SCORING_DB_URL` db-тесты скипаются |
-| `transactions_repo` | function | соединение из пула на один тест + репозиторий |
+| `transactions_repo` | session | репозиторий БД; без `SCORING_DB_URL` db-тесты скипаются |
 | `test_data` | function | созданный пользователь (`test_data["user_id"]`), удаляется в teardown |
 | `created_users` | function | реестр id для тестов, которые создают юзера сами; удаляются в teardown |
 
@@ -173,11 +172,15 @@ export SCORING_DB_URL="postgresql+psycopg2://<user>:<password>@<host>:5432/scori
 
 Устройство слоя:
 
-* `build_engine(url)` — один `Engine` на прогон (фикстура `db_engine`, скоуп
-  session), `pool_pre_ping=True` — одна дешёвая проверка при выдаче соединения,
-  чтобы прогон не падал на протухшем коннекте, если стенд передеплоили;
-* `transactions_repo` берёт из пула соединение на один тест и возвращает его в
-  teardown — соединения не текут даже на упавшем тесте;
+* `scoring_database(url)` — контекстный менеджер на весь прогон: создаёт
+  `Engine` и гарантированно вызывает `dispose()` на выходе, даже если прогон
+  прерван. `pool_pre_ping=True` — одна дешёвая проверка при выдаче соединения,
+  чтобы не падать на протухшем коннекте после передеплоя стенда;
+* **между запросами и тестами ничего не удерживается.** Репозиторий владеет
+  движком, а не соединением: каждый запрос берёт коннект из пула внутри `with`
+  и возвращает его сразу же. Выход из блока закрывает неявную транзакцию,
+  поэтому на стенде не остаётся сессий в состоянии *idle in transaction*, и
+  один тест не блокирует другой на тех же строках;
 * SQL живёт в константах модуля, параметры связываются по имени (`:user_id`),
   строки не склеиваются — инъекция невозможна;
 * каждый запрос логируется вместе с параметрами, поэтому упавшую проверку
@@ -192,8 +195,10 @@ LAST_DECISION_SQL = """
 """
 ```
 
-`sqlalchemy` импортируется лениво внутри функций: без установленного пакета или
-драйвера сьют всё равно собирается, а db-тесты просто скипаются.
+Все импорты — на уровне модулей, ленивых импортов внутри функций в коде нет.
+`SQLAlchemy` объявлена обязательной зависимостью в `requirements.txt`; драйвер
+БД подтягивается только при создании движка, поэтому без `SCORING_DB_URL`
+db-тесты скипаются и psycopg2 не требуется.
 
 ## Логирование
 

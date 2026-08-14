@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from api.clients.base_client import build_session
-from api.clients.db_client import TransactionsRepository, build_engine
+from api.clients.db_client import scoring_database
 from api.clients.scoring_client import ScoringClient
 from api.utils.payloads import new_user
 from utils.config import Config
@@ -24,7 +24,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import requests
-    from sqlalchemy import Engine
+
+    from api.clients.db_client import TransactionsRepository
 
 log = get_logger("fixture")
 
@@ -73,25 +74,19 @@ def scoring_client(config: Config, http_session: requests.Session) -> ScoringCli
 
 
 @pytest.fixture(scope="session")
-def db_engine(config: Config) -> Iterator[Engine]:
-    """One SQLAlchemy engine per run. Without a URL the db tests are skipped."""
+def transactions_repo(config: Config) -> Iterator[TransactionsRepository]:
+    """Database repository for the run. Without a URL the db tests are skipped.
+
+    Session-scoped on purpose: the repository holds no connection of its own,
+    each query takes one from the pool and returns it, so nothing leaks between
+    tests and there is no per-test setup to pay for.
+    """
     if not config.db_configured:
         log.warning("SCORING_DB_URL is not set: skipping the database checks")
         pytest.skip("SCORING_DB_URL is not set: database checks are skipped")
 
-    engine = build_engine(config.db_url)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        log.info("database engine disposed")
-
-
-@pytest.fixture
-def transactions_repo(db_engine: Engine) -> Iterator[TransactionsRepository]:
-    """A connection from the pool for one test; returned to the pool in teardown."""
-    with db_engine.connect() as connection:
-        yield TransactionsRepository(connection)
+    with scoring_database(config.db_url) as repository:
+        yield repository
 
 
 @pytest.fixture

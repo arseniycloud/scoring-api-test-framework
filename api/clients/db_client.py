@@ -6,22 +6,28 @@ f-string — that is both injection safety and correct type escaping. Every quer
 is logged with its parameters, so a failing DB check can be reproduced by hand
 straight from the log.
 
-SQLAlchemy is imported lazily: without the package (or the DB driver) installed
-the suite still collects, and tests marked `db` are simply skipped.
+Nothing is held between queries. The repository owns the engine, and every
+query borrows a connection from the pool inside a `with` block: leaving it
+closes the implicit transaction and hands the connection back. A test never
+leaves an "idle in transaction" session behind on the stand, and one test
+cannot block another on the same rows.
 """
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import allure
+from sqlalchemy import create_engine, text
 
 from utils.logger import get_logger
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from sqlalchemy import Engine
-    from sqlalchemy.engine import Connection
 
 log = get_logger("db")
 
@@ -44,19 +50,28 @@ def build_engine(url: str) -> Engine:
     from stale connections when a stand is redeployed mid-run. Pool sizing is
     left at the SQLAlchemy default — a test suite holds one connection at a time.
     """
-    from sqlalchemy import create_engine  # noqa: PLC0415 — lazy import, see module docstring
-
     engine = create_engine(url, pool_pre_ping=True)
 
     log.info("database engine ready: %s", engine.url.render_as_string(hide_password=True))
     return engine
 
 
+@contextmanager
+def scoring_database(url: str) -> Iterator[TransactionsRepository]:
+    """Repository for the whole run; the engine and its pool are disposed on exit."""
+    engine = build_engine(url)
+    try:
+        yield TransactionsRepository(engine)
+    finally:
+        engine.dispose()
+        log.info("database engine disposed")
+
+
 class TransactionsRepository:
     """Read-only repository over the transactions table."""
 
-    def __init__(self, connection: Connection) -> None:
-        self._connection = connection
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
 
     @allure.step("Read decision of the last transaction from DB")
     def last_decision(self, user_id: str) -> str:
@@ -76,14 +91,16 @@ class TransactionsRepository:
         return count
 
     def _fetch_one(self, statement: str, params: dict[str, Any]) -> tuple[Any, ...]:
-        """First row of a query, or an empty tuple when nothing matched."""
-        from sqlalchemy import text  # noqa: PLC0415 — lazy import, see module docstring
+        """First row of a query, or an empty tuple when nothing matched.
 
+        The connection is borrowed and returned inside this method, so no
+        transaction outlives the query that opened it.
+        """
         log.debug("SQL: %s | params: %s", " ".join(statement.split()), params)
 
-        result = self._connection.execute(text(statement), params)
-        row = result.first()
-        values = tuple(row) if row else ()
+        with self._engine.connect() as connection:
+            row = connection.execute(text(statement), params).first()
 
+        values = tuple(row) if row else ()
         log.debug("SQL row: %s", values)
         return values
