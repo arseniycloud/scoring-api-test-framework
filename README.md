@@ -205,10 +205,12 @@ export SCORING_DB_URL="postgresql+psycopg2://<user>:<password>@<host>:5432/scori
   удерживаем»: `cursor()` — на чтение, `transaction()` — на запись:
 
   ```python
-  with scoring_db.cursor() as cur:                     # разовый SELECT
+  # разовый SELECT
+  with scoring_db.cursor() as cur:
       cur.execute(text("SELECT ..."), {"user_id": user_id})
 
-  with scoring_db.transaction() as cur:                # подготовка или уборка данных
+  # подготовка или уборка данных
+  with scoring_db.transaction() as cur:
       cur.execute(text("DELETE FROM transactions WHERE user_id = :user_id"), params)
   ```
 
