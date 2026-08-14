@@ -43,7 +43,7 @@ ignore = [
     "PLR0917",  # "positional" arguments = fixtures plus parametrize params
     "ARG",      # a fixture may be needed for its side effect, not its value
 ]
-# Custom pytest fixtures live in the root conftest.py — it is not a package.
+# The root conftest.py is pytest's entry point, not a package module.
 "conftest.py" = ["INP001"]
 # psycopg2 has no stubs and requests passthrough kwargs are honestly Any.
 "api/clients/*.py" = ["ANN401"]

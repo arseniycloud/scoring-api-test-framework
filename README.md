@@ -9,7 +9,11 @@ API-тесты сервиса скоринга транзакций. Вырос�
 
 ```
 scoring_test_framework/
-├── conftest.py                  # фикстуры: config → session → scoring_client → test_data
+├── conftest.py                  # точка входа pytest: список плагинов с фикстурами
+├── fixtures/
+│   ├── environment.py           # конфиг прогона и CLI-опции (системный слой)
+│   ├── clients.py               # scoring_client, transactions_repo, http_session
+│   └── data.py                  # test_data, created_users — setup и teardown данных
 ├── pytest.ini                   # pythonpath, маркеры, логирование, отключение чужих плагинов
 ├── ruff.toml                    # правила линтера, line-length 110 (наследует pyproject.toml проекта)
 ├── requirements.txt
@@ -118,14 +122,27 @@ AssertionError: Expected BLOCK, got APPROVE: {'id': '2e2f1ff3-…', 'decision': 
 
 ## Фикстуры
 
-| Фикстура | Скоуп | Что даёт |
-|---|---|---|
-| `config` | session | `Config` из окружения, `--scoring-base-url` перекрывает `SCORING_BASE_URL` |
-| `http_session` | session | `requests.Session` с ретраями, закрывается в teardown |
-| `scoring_client` | session | `ScoringClient` — доменные методы поверх транспорта |
-| `transactions_repo` | session | репозиторий БД; без `SCORING_DB_URL` db-тесты скипаются |
-| `test_data` | function | созданный пользователь (`test_data["user_id"]`), удаляется в teardown |
-| `created_users` | function | реестр id для тестов, которые создают юзера сами; удаляются в teardown |
+`conftest.py` держит только оглавление — сами фикстуры лежат в `fixtures/`,
+разделённые по назначению: системный слой (конфиг, CLI) отдельно от того, с чем
+работает автор теста (клиент, БД, тестовые данные).
+
+```python
+# conftest.py целиком
+pytest_plugins = [
+    "fixtures.environment",
+    "fixtures.clients",
+    "fixtures.data",
+]
+```
+
+| Фикстура | Модуль | Скоуп | Что даёт |
+|---|---|---|---|
+| `config` | environment | session | `Config` из окружения, `--scoring-base-url` перекрывает `SCORING_BASE_URL` |
+| `http_session` | clients | session | `requests.Session` с ретраями, закрывается в teardown |
+| `scoring_client` | clients | session | `ScoringClient` — доменные методы поверх транспорта |
+| `transactions_repo` | clients | session | доступ к БД; без `SCORING_DB_URL` db-тесты скипаются |
+| `test_data` | data | function | созданный пользователь (`test_data["user_id"]`), удаляется в teardown |
+| `created_users` | data | function | реестр id для тестов, которые создают юзера сами; удаляются в teardown |
 
 ## Запуск
 
