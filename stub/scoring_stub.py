@@ -56,7 +56,6 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
 
-
     def do_POST(self):
         path = urlparse(self.path).path
         body = self._body()
