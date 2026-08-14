@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from api.clients.db_client import scoring_database
+from api.clients.scoring_db_client import scoring_database
 
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from api.clients.db_client import ScoringDatabase
+    from api.clients.scoring_db_client import ScoringDatabase
     from utils.config import Config
 
 

@@ -26,10 +26,12 @@ def decide(user_id, txn):
     count = len(TRANSACTIONS[user_id])
     if count > 5:
         return "MANUAL_REVIEW"
+
     if txn["amount"] >= 50_000 or (
         txn["category"] == "crypto" and txn["country"] != USERS[user_id]["country"]
     ):
         return "BLOCK"
+
     return "APPROVE"
 
 
@@ -40,16 +42,20 @@ class Handler(BaseHTTPRequestHandler):
     def _send(self, code, payload=None):
         body = b"" if payload is None else json.dumps(payload).encode()
         self.send_response(code)
+
         if body:
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+
         self.end_headers()
+
         if body:
             self.wfile.write(body)
 
     def _body(self):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
+
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -58,17 +64,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/users":
             if not body.get("name") or body.get("country") not in COUNTRIES:
                 return self._send(400, {"error": "invalid user payload"})
+
             user_id = str(uuid.uuid4())
             USERS[user_id] = {"id": user_id, "name": body["name"], "country": body["country"]}
             TRANSACTIONS[user_id] = []
+
             return self._send(201, USERS[user_id])
 
         if path == "/api/transactions":
             user_id = body.get("user_id")
             if not isinstance(body.get("amount"), int):
                 return self._send(400, {"error": "invalid amount"})
+
             if user_id not in USERS:
                 return self._send(404, {"error": "user not found"})
+
             txn = {
                 "id": str(uuid.uuid4()),
                 "user_id": user_id,
@@ -87,10 +97,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+
         if parsed.path == "/api/transactions":
             user_id = parse_qs(parsed.query).get("user_id", [""])[0]
+
             if user_id not in USERS:
                 return self._send(404, {"error": "user not found"})
+
             return self._send(200, TRANSACTIONS[user_id])
 
         match = USER_RE.match(parsed.path)

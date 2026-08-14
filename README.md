@@ -22,9 +22,10 @@ scoring_test_framework/
 ├── api/
 │   ├── models.py                # Pydantic: *Payload на запрос, User/Transaction на ответ
 │   ├── clients/
-│   │   ├── base_client.py       # транспорт: Retry/backoff, таймауты, логи, attach в Allure
-│   │   ├── scoring_client.py    # доменные методы + wait_for_decision (поллинг вместо sleep)
-│   │   └── db_client.py         # SQLAlchemy: scoring_database() + ScoringDatabase
+│   │   ├── base_client.py       # HTTP-транспорт: Retry/backoff, таймауты, логи, attach в Allure
+│   │   ├── scoring_client.py     # доменные методы API + wait_for_scored (поллинг вместо sleep)
+│   │   ├── base_db_client.py    # транспорт БД: engine, пул, cursor() и transaction()
+│   │   └── scoring_db_client.py # SQL и именованные запросы к БД
 │   └── utils/
 │       ├── constants.py         # SCR_RESPONSE_KEYS, SCR_INVALID_DATA, SCR_LIMITS, enum'ы
 │       ├── payloads.py          # фабрики тел запросов: new_user(), high_risk_transaction(), …
@@ -189,6 +190,13 @@ export SCORING_DB_URL="postgresql+psycopg2://<user>:<password>@<host>:5432/scori
 ```
 
 Устройство слоя:
+
+Слой разделён так же, как HTTP: транспорт отдельно, домен отдельно.
+
+| Файл | Отвечает за |
+|---|---|
+| `base_db_client.py` | `build_engine()`, пул, `cursor()`, `transaction()`, `fetch_one()` — *как* запрос доходит до базы |
+| `scoring_db_client.py` | SQL-константы и именованные запросы (`last_decision`, `count_transactions`) — *какой* это запрос |
 
 * `scoring_database(url)` — контекстный менеджер на весь прогон: создаёт
   `Engine` и гарантированно вызывает `dispose()` на выходе, даже если прогон
