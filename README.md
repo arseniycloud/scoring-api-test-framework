@@ -35,8 +35,10 @@ scoring_test_framework/
 │   ├── config.py                # Config.from_env(): адреса, URL БД, таймауты, ретраи
 │   ├── logger.py                # get_logger(), mask_secrets(), preview()
 │   └── utils.py                 # HTTP_STATUS_*, RETRYABLE_STATUSES, env-хелперы
-├── stub/
-│   └── scoring_stub.py          # заглушка сервиса на stdlib: чтобы сьют можно было запустить
+├── mock_server/                 # mock-сервис на stdlib: чтобы сьют можно было запустить
+│   ├── scoring.py               # что сервис делает: состояние, правила, эндпоинты, ROUTES
+│   ├── server.py                # как запрос доходит до обработчика: одна таблица маршрутов
+│   └── __main__.py              # python3 -m mock_server
 └── tests/
     ├── test_users.py            # TestUsers
     ├── test_transactions.py     # TestTransactionScoring
@@ -148,11 +150,11 @@ pytest_plugins = [
 
 ## Запуск
 
-Быстрый старт без стенда — на встроенной заглушке:
+Быстрый старт без стенда — на встроенном mock-сервере:
 
 ```bash
 pip install -r requirements.txt
-python3 stub/scoring_stub.py &
+python3 -m mock_server &
 SCORING_BASE_URL=http://127.0.0.1:8099 pytest -m "not db"    # 18 passed
 ```
 
@@ -307,6 +309,7 @@ ruff format .       # форматирование, line-length 110
 `ruff.toml` наследует общий набор правил проекта (`extend = "../pyproject.toml"`)
 и добавляет только то, что специфично для тестового кода:
 
+* `ANN401` разрешён в `mock_server/` — обработчик отдаёт то, что просил тест;
 * `S101` разрешён в `tests/` и в модулях валидаторов — `assert` тут инструмент,
   а не уязвимость;
 * `ANN` выключен в `tests/` — сигнатуры тестов пишем без аннотаций, как в

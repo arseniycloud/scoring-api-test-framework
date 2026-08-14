@@ -51,9 +51,8 @@ ignore = [
 "api/utils/validators.py" = ["ANN401"]
 # A pydantic "before" validator sees whatever the service sent — Any is the truth.
 "api/models.py" = ["ANN401"]
-# The stub is a throwaway service, not framework code: it mirrors the API under
-# test, not our conventions. N802 covers BaseHTTPRequestHandler's do_GET naming.
-"stub/*.py" = ["INP001", "ANN", "N802", "ARG002"]
+# The mock server mirrors the API under test, not our conventions.
+"mock_server/*.py" = ["ANN401"]
 
 [lint.isort]
 known-first-party = ["api", "utils", "tests"]
