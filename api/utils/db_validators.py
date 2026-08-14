@@ -6,16 +6,12 @@ failed check in exactly one way.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import allure
 
+from api.utils.constants import Decision
 from api.utils.validators import fail
 from utils.logger import get_logger
 
-
-if TYPE_CHECKING:
-    from api.utils.constants import Decision
 
 log = get_logger("check.db")
 

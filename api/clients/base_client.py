@@ -8,19 +8,17 @@ so every call the suite makes is logged in one place and in one format.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import allure
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from utils.config import Config
 from utils.logger import get_logger, mask_secrets, preview
 from utils.utils import RETRYABLE_STATUSES
 
-
-if TYPE_CHECKING:
-    from utils.config import Config
 
 log = get_logger("http")
 

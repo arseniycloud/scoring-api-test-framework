@@ -13,18 +13,14 @@ test cannot block another on the same rows.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import Connection, Engine, create_engine, text
 
 from utils.logger import get_logger
 
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from sqlalchemy import Connection, Engine
 
 log = get_logger("db")
 

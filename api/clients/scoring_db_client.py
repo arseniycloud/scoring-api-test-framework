@@ -10,17 +10,14 @@ Connections, pooling and the two cursors come from `BaseDbClient`.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
 
 import allure
 
 from api.clients.base_db_client import BaseDbClient, build_engine
 from utils.logger import get_logger
 
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 log = get_logger("db")
 

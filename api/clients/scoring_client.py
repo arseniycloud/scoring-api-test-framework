@@ -3,24 +3,20 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import allure
+import requests
 
 from api.clients.base_client import BaseApiClient, build_session
 from api.models import NOT_SCORED, Transaction, TransactionPayload, User, UserPayload
 from api.utils.validators import assert_created, assert_status_code, assert_valid_json
+from utils.config import Config
 from utils.logger import get_logger
 from utils.utils import HTTP_STATUS_OK
 
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    import requests
-
-    from utils.config import Config
 
 log = get_logger("scoring")
 

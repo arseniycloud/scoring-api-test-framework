@@ -6,18 +6,15 @@ cleanup also runs when the test fails or the run is interrupted.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
+from api.clients.scoring_client import ScoringClient
 from api.utils.payloads import new_user
 from utils.logger import get_logger
 
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from api.clients.scoring_client import ScoringClient
 
 log = get_logger("fixture")
 

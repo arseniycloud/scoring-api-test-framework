@@ -9,21 +9,17 @@ and on which response. Database checks live in `db_validators.py`.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from http import HTTPStatus
+from typing import Any
 
 import allure
+import requests
 
+from api.models import Transaction
+from api.utils.constants import Decision
 from utils.logger import get_logger, preview
 from utils.utils import HTTP_STATUS_CREATED
 
-
-if TYPE_CHECKING:
-    from http import HTTPStatus
-
-    import requests
-
-    from api.models import Transaction
-    from api.utils.constants import Decision
 
 log = get_logger("check")
 

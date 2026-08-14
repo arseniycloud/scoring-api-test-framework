@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Iterator
 
 import pytest
 
-from api.clients.scoring_client import scoring_api
-
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from api.clients.scoring_client import ScoringClient
-    from utils.config import Config
+from api.clients.scoring_client import ScoringClient, scoring_api
+from utils.config import Config
 
 
 @pytest.fixture(scope="session")

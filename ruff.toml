@@ -6,6 +6,9 @@
 line-length = 110
 target-version = "py312"
 
+# `TC` (flake8-type-checking) is deliberately not selected: every import stays at
+# the top of the module, in one place, instead of being split between a runtime
+# block and an `if TYPE_CHECKING` block.
 [lint]
 select = [
     "E", "W", "F",      # pycodestyle + pyflakes
@@ -21,7 +24,7 @@ select = [
     "FA",               # future-annotations
     "ISC", "ICN", "G",  # implicit-str-concat, import-conventions, logging-format
     "INP", "PIE", "T20", "PT", "Q", "RET", "RSE", "RUF",
-    "SIM", "TID", "TC", "ARG", "PTH", "ERA", "PGH", "PL", "TRY", "PERF", "FURB", "LOG",
+    "SIM", "TID", "ARG", "PTH", "ERA", "PGH", "PL", "TRY", "PERF", "FURB", "LOG",
 ]
 ignore = [
     "E501",     # line length is enforced by the formatter
@@ -58,8 +61,3 @@ ignore = [
 known-first-party = ["api", "utils", "tests"]
 lines-after-imports = 2
 
-[lint.flake8-type-checking]
-# Pydantic and dataclass resolve annotations at runtime: their imports must not
-# be hidden behind `if TYPE_CHECKING`, otherwise the models fail to build.
-runtime-evaluated-base-classes = ["pydantic.BaseModel"]
-runtime-evaluated-decorators = ["dataclasses.dataclass"]
