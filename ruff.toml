@@ -1,0 +1,66 @@
+# Ruff config for the test framework — self-contained, no parent file needed.
+#
+# Line length is 110 on purpose: the formatter cannot "fill" a line, it explodes
+# anything that does not fit into one item per line. Keeping every import and
+# signature inside the limit is what keeps them on 2-3 lines instead of columns.
+line-length = 110
+target-version = "py312"
+
+[lint]
+select = [
+    "E", "W", "F",      # pycodestyle + pyflakes
+    "I",                # isort
+    "N",                # pep8-naming
+    "UP",               # pyupgrade
+    "ANN",              # flake8-annotations
+    "S",                # flake8-bandit
+    "B",                # flake8-bugbear
+    "C4",               # comprehensions
+    "DTZ",              # datetimez
+    "EM",               # errmsg
+    "FA",               # future-annotations
+    "ISC", "ICN", "G",  # implicit-str-concat, import-conventions, logging-format
+    "INP", "PIE", "T20", "PT", "Q", "RET", "RSE", "RUF",
+    "SIM", "TID", "TC", "ARG", "PTH", "ERA", "PGH", "PL", "TRY", "PERF", "FURB", "LOG",
+]
+ignore = [
+    "E501",     # line length is enforced by the formatter
+    "COM812",   # trailing comma — the formatter decides
+    "ISC001",   # conflicts with the formatter
+    "PLR0913",  # many arguments: fixtures plus parametrize params
+    "PLR2004",  # magic value in comparison: fine in tests
+    "TRY003",   # long messages in exceptions are the point here
+    "RUF001",   # ambiguous characters: failure messages contain prose
+    "EM101", "EM102",  # message built inline is easier to read than a temp var
+]
+
+[lint.per-file-ignores]
+# Tests follow the working project's style: no annotations, fixtures come as
+# arguments, assert is the main tool.
+"tests/**/*.py" = [
+    "S101",     # assert in tests
+    "ANN",      # no annotations in test signatures
+    "PLR0917",  # "positional" arguments = fixtures plus parametrize params
+    "ARG",      # a fixture may be needed for its side effect, not its value
+]
+# Custom pytest fixtures live in the root conftest.py — it is not a package.
+"conftest.py" = ["INP001"]
+# psycopg2 has no stubs and requests passthrough kwargs are honestly Any.
+"api/clients/*.py" = ["ANN401"]
+# A parsed JSON body is genuinely Any — the service decides its shape.
+"api/utils/validators.py" = ["ANN401"]
+# A pydantic "before" validator sees whatever the service sent — Any is the truth.
+"api/models.py" = ["ANN401"]
+# The stub is a throwaway service, not framework code: it mirrors the API under
+# test, not our conventions. N802 covers BaseHTTPRequestHandler's do_GET naming.
+"stub/*.py" = ["INP001", "ANN", "N802", "ARG002"]
+
+[lint.isort]
+known-first-party = ["api", "utils", "tests"]
+lines-after-imports = 2
+
+[lint.flake8-type-checking]
+# Pydantic and dataclass resolve annotations at runtime: their imports must not
+# be hidden behind `if TYPE_CHECKING`, otherwise the models fail to build.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+runtime-evaluated-decorators = ["dataclasses.dataclass"]

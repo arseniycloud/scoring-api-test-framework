@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+allure-results/
+logs/
+.env
+
+# сторонние pytest-плагины из глобального окружения
+snapshot_failures/
+__snapshots__/
