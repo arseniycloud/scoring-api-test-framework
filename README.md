@@ -12,7 +12,8 @@ scoring_test_framework/
 ├── conftest.py                  # точка входа pytest: список плагинов с фикстурами
 ├── fixtures/
 │   ├── environment.py           # конфиг прогона и CLI-опции (системный слой)
-│   ├── clients.py               # scoring_client, transactions_repo, http_session
+│   ├── clients.py               # scoring_client — одна фикстура
+│   ├── database.py              # scoring_db — одна фикстура
 │   └── data.py                  # test_data, created_users — setup и teardown данных
 ├── pytest.ini                   # pythonpath, маркеры, логирование, отключение чужих плагинов
 ├── ruff.toml                    # правила линтера, line-length 110 (наследует pyproject.toml проекта)
@@ -23,7 +24,7 @@ scoring_test_framework/
 │   ├── clients/
 │   │   ├── base_client.py       # транспорт: Retry/backoff, таймауты, логи, attach в Allure
 │   │   ├── scoring_client.py    # доменные методы + wait_for_decision (поллинг вместо sleep)
-│   │   └── db_client.py         # SQLAlchemy: scoring_database() + TransactionsRepository
+│   │   └── db_client.py         # SQLAlchemy: scoring_database() + ScoringDatabase
 │   └── utils/
 │       ├── constants.py         # SCR_RESPONSE_KEYS, SCR_INVALID_DATA, SCR_LIMITS, enum'ы
 │       ├── payloads.py          # фабрики тел запросов: new_user(), high_risk_transaction(), …
@@ -131,6 +132,7 @@ AssertionError: Expected BLOCK, got APPROVE: {'id': '2e2f1ff3-…', 'decision': 
 pytest_plugins = [
     "fixtures.environment",
     "fixtures.clients",
+    "fixtures.database",
     "fixtures.data",
 ]
 ```
@@ -138,9 +140,8 @@ pytest_plugins = [
 | Фикстура | Модуль | Скоуп | Что даёт |
 |---|---|---|---|
 | `config` | environment | session | `Config` из окружения, `--scoring-base-url` перекрывает `SCORING_BASE_URL` |
-| `http_session` | clients | session | `requests.Session` с ретраями, закрывается в teardown |
-| `scoring_client` | clients | session | `ScoringClient` — доменные методы поверх транспорта |
-| `transactions_repo` | clients | session | доступ к БД; без `SCORING_DB_URL` db-тесты скипаются |
+| `scoring_client` | clients | session | клиент API; HTTP-сессия с ретраями закрывается на выходе |
+| `scoring_db` | database | session | доступ к БД; без `SCORING_DB_URL` db-тесты скипаются |
 | `test_data` | data | function | созданный пользователь (`test_data["user_id"]`), удаляется в teardown |
 | `created_users` | data | function | реестр id для тестов, которые создают юзера сами; удаляются в teardown |
 
@@ -191,7 +192,7 @@ export SCORING_DB_URL="postgresql+psycopg2://<user>:<password>@<host>:5432/scori
 
 * `scoring_database(url)` — контекстный менеджер на весь прогон: создаёт
   `Engine` и гарантированно вызывает `dispose()` на выходе, даже если прогон
-  прерван. `pool_pre_ping=True` — одна дешёвая проверка при выдаче соединения,
+  прерван. Клиент API устроен симметрично — `scoring_api(config)`. `pool_pre_ping=True` — одна дешёвая проверка при выдаче соединения,
   чтобы не падать на протухшем коннекте после передеплоя стенда;
 * **между запросами и тестами ничего не удерживается.** Репозиторий владеет
   движком, а не соединением: каждый запрос берёт коннект из пула внутри `with`
@@ -200,6 +201,14 @@ export SCORING_DB_URL="postgresql+psycopg2://<user>:<password>@<host>:5432/scori
   один тест не блокирует другой на тех же строках;
 * SQL живёт в константах модуля, параметры связываются по имени (`:user_id`),
   строки не склеиваются — инъекция невозможна;
+* для разового запроса есть курсор — тот же контекстный менеджер, та же
+  гарантия «ничего не удерживаем»:
+
+  ```python
+  with scoring_db.cursor() as cur:
+      cur.execute(text("SELECT ..."), {"user_id": user_id})
+  ```
+
 * каждый запрос логируется вместе с параметрами, поэтому упавшую проверку
   можно повторить руками прямо из лога.
 

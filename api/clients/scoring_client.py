@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import time
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import allure
 
-from api.clients.base_client import BaseApiClient
+from api.clients.base_client import BaseApiClient, build_session
 from api.models import NOT_SCORED, Transaction, TransactionPayload, User, UserPayload
 from api.utils.validators import assert_created, assert_status_code, assert_valid_json
 from utils.logger import get_logger
@@ -15,12 +16,27 @@ from utils.utils import HTTP_STATUS_OK
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import requests
+
+    from utils.config import Config
 
 log = get_logger("scoring")
 
 USERS = "/api/users"
 TRANSACTIONS = "/api/transactions"
+
+
+@contextmanager
+def scoring_api(config: Config) -> Iterator[ScoringClient]:
+    """Client for the whole run; the HTTP session is closed on exit."""
+    session = build_session(config)
+    try:
+        yield ScoringClient(config, session)
+    finally:
+        session.close()
+        log.info("HTTP session closed")
 
 
 class ScoringClient(BaseApiClient):

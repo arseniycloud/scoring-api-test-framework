@@ -31,9 +31,10 @@ class Config:
     decision_poll_interval: float = 0.5
 
     @classmethod
-    def from_env(cls) -> Config:
+    def from_env(cls, base_url: str = "") -> Config:
+        """Read the environment. A non-empty `base_url` (from CLI) wins over it."""
         return cls(
-            base_url=env_str("SCORING_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
+            base_url=(base_url or env_str("SCORING_BASE_URL", DEFAULT_BASE_URL)).rstrip("/"),
             db_url=env_str("SCORING_DB_URL"),
             request_timeout=env_float("SCORING_REQUEST_TIMEOUT", 10.0),
             total_retries=env_int("SCORING_RETRIES", 3),

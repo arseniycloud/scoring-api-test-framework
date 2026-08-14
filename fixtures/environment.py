@@ -1,12 +1,10 @@
-"""Run configuration: CLI options, logging setup, the `config` fixture.
+"""Run configuration: CLI options and logging setup.
 
-Plumbing, not test material. A test never asks for anything here directly —
-it asks for a client, and the client already carries this configuration.
+Plumbing, not test material. A test never asks for `config` directly — it asks
+for a client, and the client already carries this configuration.
 """
 
 from __future__ import annotations
-
-from dataclasses import replace
 
 import pytest
 
@@ -33,11 +31,8 @@ def pytest_configure(config: pytest.Config) -> None:  # noqa: ARG001 — pytest 
 
 @pytest.fixture(scope="session")
 def config(request: pytest.FixtureRequest) -> Config:
-    """Config from the environment; `--scoring-base-url` wins over env."""
-    run_config = Config.from_env()
-    cli_base_url = request.config.getoption("--scoring-base-url")
-    if cli_base_url:
-        run_config = replace(run_config, base_url=cli_base_url.rstrip("/"))
+    """Run configuration: environment variables, overridden by CLI options."""
+    run_config = Config.from_env(base_url=request.config.getoption("--scoring-base-url"))
 
     log.info("run config: base_url=%s db_configured=%s", run_config.base_url, run_config.db_configured)
     log.debug("full config: %s", mask_secrets(str(run_config)))

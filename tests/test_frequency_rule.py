@@ -42,7 +42,7 @@ class TestFrequencyRule:
     @allure.title("Positive: every sent transaction is persisted in API and DB")
     @pytest.mark.positive
     @pytest.mark.db
-    def test_all_transactions_are_persisted(self, scoring_client, transactions_repo, test_data):
+    def test_all_transactions_are_persisted(self, scoring_client, scoring_db, test_data):
         payload = grocery_transaction(test_data["user_id"])
         expected_count = FREQUENCY_THRESHOLD + 1
 
@@ -52,4 +52,4 @@ class TestFrequencyRule:
 
         transactions = scoring_client.get_transactions(test_data["user_id"])
         assert len(transactions) == expected_count
-        assert_db_count(transactions_repo.count_for_user(test_data["user_id"]), expected_count)
+        assert_db_count(scoring_db.count_transactions(test_data["user_id"]), expected_count)

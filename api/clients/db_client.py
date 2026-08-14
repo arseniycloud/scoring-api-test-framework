@@ -6,8 +6,8 @@ f-string — that is both injection safety and correct type escaping. Every quer
 is logged with its parameters, so a failing DB check can be reproduced by hand
 straight from the log.
 
-Nothing is held between queries. The repository owns the engine, and every
-query borrows a connection from the pool inside a `with` block: leaving it
+Nothing is held between queries. `ScoringDatabase` owns the engine, and every
+query takes a cursor from the pool inside a `with` block: leaving the block
 closes the implicit transaction and hands the connection back. A test never
 leaves an "idle in transaction" session behind on the stand, and one test
 cannot block another on the same rows.
@@ -27,7 +27,7 @@ from utils.logger import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from sqlalchemy import Engine
+    from sqlalchemy import Connection, Engine
 
 log = get_logger("db")
 
@@ -57,21 +57,34 @@ def build_engine(url: str) -> Engine:
 
 
 @contextmanager
-def scoring_database(url: str) -> Iterator[TransactionsRepository]:
-    """Repository for the whole run; the engine and its pool are disposed on exit."""
+def scoring_database(url: str) -> Iterator[ScoringDatabase]:
+    """Database for the whole run; the engine and its pool are disposed on exit."""
     engine = build_engine(url)
     try:
-        yield TransactionsRepository(engine)
+        yield ScoringDatabase(engine)
     finally:
         engine.dispose()
         log.info("database engine disposed")
 
 
-class TransactionsRepository:
-    """Read-only repository over the transactions table."""
+class ScoringDatabase:
+    """Read access to the scoring database: named queries, no SQL in tests."""
 
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
+
+    @contextmanager
+    def cursor(self) -> Iterator[Connection]:
+        """A cursor for one operation, returned to the pool when the block ends.
+
+        Named queries below cover what the tests need; this is the escape hatch
+        for a one-off check, and it keeps the same no-holds guarantee:
+
+            with scoring_db.cursor() as cur:
+                cur.execute(text("SELECT ..."), {"user_id": user_id})
+        """
+        with self._engine.connect() as connection:
+            yield connection
 
     @allure.step("Read decision of the last transaction from DB")
     def last_decision(self, user_id: str) -> str:
@@ -83,7 +96,8 @@ class TransactionsRepository:
         return decision
 
     @allure.step("Count transactions of a user in DB")
-    def count_for_user(self, user_id: str) -> int:
+    def count_transactions(self, user_id: str) -> int:
+        """How many transactions the database holds for a user."""
         row = self._fetch_one(COUNT_FOR_USER_SQL, {"user_id": user_id})
         count = int(row[0]) if row else 0
 
@@ -91,14 +105,10 @@ class TransactionsRepository:
         return count
 
     def _fetch_one(self, statement: str, params: dict[str, Any]) -> tuple[Any, ...]:
-        """First row of a query, or an empty tuple when nothing matched.
-
-        The connection is borrowed and returned inside this method, so no
-        transaction outlives the query that opened it.
-        """
+        """First row of a query, or an empty tuple when nothing matched."""
         log.debug("SQL: %s | params: %s", " ".join(statement.split()), params)
 
-        with self._engine.connect() as connection:
+        with self.cursor() as connection:
             row = connection.execute(text(statement), params).first()
 
         values = tuple(row) if row else ()

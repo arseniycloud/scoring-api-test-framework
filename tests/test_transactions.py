@@ -52,7 +52,7 @@ class TestTransactionScoring:
     @allure.title("Positive: high-risk transaction is blocked and stored in DB")
     @pytest.mark.positive
     @pytest.mark.db
-    def test_high_risk_transaction_is_blocked(self, scoring_client, transactions_repo, test_data):
+    def test_high_risk_transaction_is_blocked(self, scoring_client, scoring_db, test_data):
         payload = high_risk_transaction(test_data["user_id"])
 
         response = scoring_client.create_transaction(payload)
@@ -60,7 +60,7 @@ class TestTransactionScoring:
 
         scored = scoring_client.wait_for_scored(test_data["user_id"])
         assert_decision(scored, Decision.BLOCK)
-        assert_db_decision(transactions_repo.last_decision(test_data["user_id"]), Decision.BLOCK)
+        assert_db_decision(scoring_db.last_decision(test_data["user_id"]), Decision.BLOCK)
 
     @allure.title("Positive: decision depends on amount, category and country")
     @pytest.mark.positive
